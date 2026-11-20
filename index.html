@@ -12,88 +12,210 @@
     --fg: #1a1a1a;
     --muted: #5c5c5c;
     --border: #8a8a8a;
-    --user-bg: #e6edfb;
-    --agent-bg: #f2f2f2;
+    --soft: #ececec; /* user bubble, hover, code background */
+    --sidebar-bg: #f7f7f8;
     --accent: #2152c9;
     --accent-fg: #ffffff;
     --error: #b3261e;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #161616;
+      --bg: #212121;
       --fg: #ececec;
       --muted: #a6a6a6;
-      --border: #6e6e6e;
-      --user-bg: #23324d;
-      --agent-bg: #242424;
+      --border: #7a7a7a;
+      --soft: #303030;
+      --sidebar-bg: #171717;
       --accent: #8fb0ff;
       --accent-fg: #111111;
       --error: #ff8a80;
     }
   }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.5 system-ui, sans-serif; }
-  main {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
     height: 100dvh;
-    max-width: 48rem;
-    margin-inline: auto;
-    padding-inline: 1rem;
-  }
-  #log { flex: 1; overflow-y: auto; padding-block: 1rem; }
-  .msg { margin-block: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .user { background: var(--user-bg); margin-inline-start: 15%; }
-  .agent { background: var(--agent-bg); }
-  .note { margin-block: 0.25rem; color: var(--muted); font-size: 0.875rem; }
-  .note button { margin-inline-start: 0.5rem; padding: 0.125rem 0.625rem; }
-  .error { color: var(--error); }
-  #status { min-block-size: 1lh; margin: 0; }
-  form { display: flex; gap: 0.5rem; align-items: end; padding-block: 0.75rem; border-top: 1px solid var(--border); }
-  textarea {
-    flex: 1;
-    field-sizing: content; /* grows with the text; older browsers keep rows="2" and scroll */
-    min-block-size: 2lh;
-    max-block-size: 10lh;
-    padding: 0.5rem;
-    font: inherit;
-    color: inherit;
+    display: grid;
+    grid-template-columns: 16rem 1fr;
     background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    color: var(--fg);
+    font: 1rem/1.6 system-ui, sans-serif;
   }
-  button { padding: 0.5rem 1rem; font: inherit; color: var(--accent-fg); background: var(--accent); border: 1px solid var(--accent); border-radius: 0.5rem; cursor: pointer; }
-  button.secondary { color: var(--accent); background: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .primary { color: var(--accent-fg); background: var(--accent); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 0.375rem 0.875rem; }
+  .secondary { background: none; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.375rem 0.875rem; }
+  .ghost { color: var(--muted); background: none; border: 0; border-radius: 0.375rem; padding: 0.125rem 0.5rem; font-size: 0.8125rem; }
+  .ghost:hover:not(:disabled) { color: var(--fg); background: var(--soft); }
+
+  /* Sidebar */
+  #sidebar { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; background: var(--sidebar-bg); overflow-y: auto; }
+  #new { text-align: start; }
+  #chats { list-style: none; margin: 0; padding: 0; }
+  #chats button {
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    text-align: start;
+    background: none;
+    border: 0;
+    border-radius: 0.5rem;
+    /* Two lines, so a fork's "(fork)" suffix stays visible */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  #chats button:hover:not(:disabled), #chats button[aria-current="true"] { background: var(--soft); }
+  #menu { display: none; }
+
+  /* Conversation */
+  main { display: flex; flex-direction: column; min-width: 0; height: 100dvh; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.625rem 1rem; }
+  h1 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+  #config { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-inline-start: auto; }
+  #config label { display: flex; align-items: center; gap: 0.375rem; color: var(--muted); font-size: 0.8125rem; }
+  #config select { max-width: 11rem; padding: 0.25rem 0.5rem; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 0.5rem; }
+  #log { flex: 1; overflow-y: auto; }
+  .column { width: 100%; max-width: 48rem; margin-inline: auto; padding-inline: 1rem; }
+  #thread { padding-block: 1rem 2rem; }
+  #thread:empty::before { content: "What can I help with?"; display: block; margin-top: 28vh; text-align: center; font-size: 1.75rem; font-weight: 600; }
+  .user-turn { margin-top: 1.5rem; }
+  .user {
+    width: fit-content;
+    max-width: 80%;
+    margin-inline-start: auto;
+    padding: 0.625rem 1rem;
+    background: var(--soft);
+    border-radius: 1.25rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .agent { margin-top: 1rem; overflow-wrap: anywhere; }
+  .actions { display: flex; gap: 0.25rem; margin-top: 0.25rem; }
+  .user-turn .actions { justify-content: flex-end; }
+  .note { margin-block: 0.5rem; color: var(--muted); font-size: 0.875rem; }
+  .note .secondary { margin-inline-start: 0.5rem; padding: 0.125rem 0.625rem; font-size: 0.875rem; }
+  .error { color: var(--error); }
+  .edit { margin-top: 1.5rem; padding: 0.75rem; background: var(--soft); border-radius: 1.25rem; }
+  .edit textarea { width: 100%; field-sizing: content; min-block-size: 2lh; max-block-size: 12lh; padding: 0.25rem; font: inherit; color: inherit; background: none; border: 0; resize: none; }
+  .edit-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+  /* Markdown inside replies */
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md a { color: var(--accent); }
+  .md code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875em; }
+  .md :not(pre) > code { padding: 0.1em 0.35em; background: var(--soft); border-radius: 0.25rem; }
+  .md pre { position: relative; padding: 2rem 1rem 1rem; overflow-x: auto; background: var(--soft); border-radius: 0.5rem; }
+  .md pre .ghost { position: absolute; top: 0.375rem; right: 0.375rem; font-family: system-ui, sans-serif; }
+  .md table { display: block; overflow-x: auto; border-collapse: collapse; }
+  .md th, .md td { padding: 0.25rem 0.75rem; border: 1px solid var(--border); }
+  .md blockquote { margin-inline: 0; padding-inline-start: 1rem; border-inline-start: 3px solid var(--border); color: var(--muted); }
+
+  /* Message box */
+  #status { min-block-size: 1lh; margin: 0; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+  .composer {
+    display: flex;
+    align-items: end;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1.5rem;
+  }
+  .composer:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .composer textarea {
+    flex: 1;
+    field-sizing: content; /* grows with the text; older browsers keep rows="1" and scroll */
+    max-block-size: 10lh;
+    padding-block: 0.375rem;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    outline: none; /* the whole box shows the focus ring instead */
+    resize: none;
+  }
+  .round { width: 2.25rem; height: 2.25rem; padding: 0; border-radius: 50%; font-size: 1.125rem; line-height: 1; }
+
+  /* Phones: the sidebar becomes a drawer */
+  @media (width < 48rem) {
+    body { grid-template-columns: 1fr; }
+    #menu { display: inline-block; }
+    #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 1; width: min(18rem, 85vw); box-shadow: 0 0 1.5rem #0006; }
+    #sidebar:not(.open) { display: none; }
+  }
 </style>
 </head>
 <body>
+<nav id="sidebar" aria-label="Chats">
+  <button type="button" id="new" class="secondary lock">+ New chat</button>
+  <ul id="chats"></ul>
+</nav>
 <main>
-  <h1 class="visually-hidden">Chat with Claude</h1>
-  <!-- Not a live region: streamed chunks would be read one by one. Finished replies go to #announce. -->
-  <section id="log" aria-label="Conversation"></section>
-  <p id="status" class="note" role="status"></p>
-  <p id="announce" class="visually-hidden" aria-live="polite"></p>
-  <form id="form">
-    <label for="input" class="visually-hidden">Message</label>
-    <textarea id="input" rows="2" placeholder="Message Claude (Enter to send, Shift+Enter for a new line)"></textarea>
-    <button type="submit" id="send">Send</button>
-    <button type="button" id="stop" class="secondary" disabled>Stop</button>
-  </form>
+  <header>
+    <button type="button" id="menu" class="secondary" aria-controls="sidebar" aria-expanded="false">Chats</button>
+    <h1>Claude</h1>
+    <div id="config"></div>
+  </header>
+  <div id="log">
+    <section id="thread" class="column" aria-label="Conversation"></section>
+  </div>
+  <div class="column">
+    <p id="status" role="status"></p>
+    <!-- #thread is not a live region: streamed chunks would be read one by one. Finished replies go here. -->
+    <p id="announce" class="visually-hidden" aria-live="polite"></p>
+    <form id="form" class="composer">
+      <label for="input" class="visually-hidden">Message</label>
+      <textarea id="input" rows="1" placeholder="Message Claude"></textarea>
+      <button type="submit" id="send" class="primary round" aria-label="Send">↑</button>
+      <button type="button" id="stop" class="primary round" aria-label="Stop" hidden>■</button>
+    </form>
+  </div>
 </main>
 <script type="module">
-  const log = document.getElementById("log");
-  const form = document.getElementById("form");
-  const input = document.getElementById("input");
-  const sendButton = document.getElementById("send");
-  const stopButton = document.getElementById("stop");
-  const status = document.getElementById("status");
-  const announce = document.getElementById("announce");
+  import { marked } from "/vendor/marked.js";
+  import DOMPurify from "/vendor/purify.js";
+
+  // Links in replies open in a new tab, so the chat stays open.
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.target = "_blank";
+      node.rel = "noopener noreferrer";
+    }
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const [log, thread, form, input, sendButton, stopButton, newButton, menuButton, sidebar, chatList, status, announce, configBox] =
+    ["log", "thread", "form", "input", "send", "stop", "new", "menu", "sidebar", "chats", "status", "announce", "config"].map($);
+
   let busy = false;
-  let reply = null; // bubble that receives the streamed text
-  let replyText = "";
+  let currentId = null;
+  let reply = null; // agent message that receives the streamed text
+  let lastAgentId = null; // id of the last agent message: the fork point for the next user message
+  let turnText = ""; // the current reply, read to screen readers when it ends
+  let chatsRequest = 0;
+  let configOptions = []; // model, effort, mode, ... of the current chat
+  const dirty = new Set(); // agent messages that need a new Markdown render
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function button(label, onClick, className = "ghost") {
+    const b = el("button", className, label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    if (b.classList.contains("lock")) b.disabled = busy;
+    return b;
+  }
 
   // Follow new content only if the user is already at the bottom.
   function keepScrolled(change) {
@@ -102,23 +224,16 @@
     if (atBottom) log.scrollTop = log.scrollHeight;
   }
 
-  // textContent only: agent output is never parsed as HTML.
-  function add(className, text = "") {
-    const el = document.createElement("div");
-    el.className = className;
-    el.textContent = text;
-    keepScrolled(() => log.append(el));
-    return el;
+  function append(node) {
+    keepScrolled(() => thread.append(node));
+    return node;
   }
 
-  function setBusy(value) {
-    busy = value;
-    sendButton.disabled = value;
-    stopButton.disabled = !value;
-    status.textContent = value ? "Claude is answering…" : "";
+  function note(text, className = "note") {
+    return append(el("p", className, text));
   }
 
-  async function post(path, data) {
+  async function post(path, data = {}) {
     const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,26 +242,212 @@
     if (!res.ok) throw new Error((await res.text()) || res.statusText);
   }
 
+  const showError = (err) => note(`Error: ${err.message}`, "note error");
+
+  async function copy(text, b) {
+    try {
+      await navigator.clipboard.writeText(text);
+      b.textContent = "Copied";
+    } catch {
+      b.textContent = "Copy failed";
+    }
+    setTimeout(() => (b.textContent = "Copy"), 1500);
+  }
+
+  function addUser(text, messageId = "") {
+    const last = thread.lastElementChild;
+    // session/load can split one user message into several chunks with the same id.
+    if (messageId && last?.dataset.messageId === messageId) {
+      last.raw += text;
+      last.querySelector(".user").textContent = last.raw;
+      return;
+    }
+    const turn = el("div", "user-turn");
+    turn.dataset.messageId = messageId;
+    turn.raw = text;
+    turn.forkFrom = lastAgentId; // editing this message branches the chat here
+    const actions = el("div", "actions");
+    actions.append(button("Edit", () => startEdit(turn), "ghost lock"));
+    turn.append(el("div", "user", text), actions);
+    append(turn);
+    reply = null;
+    turnText = "";
+  }
+
+  function addText(text, messageId = "") {
+    if (!reply || reply.dataset.messageId !== messageId) {
+      const message = el("div", "agent");
+      message.dataset.messageId = messageId;
+      message.raw = "";
+      const actions = el("div", "actions");
+      actions.append(button("Copy", (e) => copy(message.raw, e.currentTarget)));
+      message.append(el("div", "md"), actions);
+      reply = append(message);
+    }
+    reply.raw += text;
+    turnText += text;
+    if (messageId) lastAgentId = messageId;
+    if (!dirty.size) requestAnimationFrame(renderMarkdown);
+    dirty.add(reply);
+  }
+
+  // Render at most once per frame, not once per streamed chunk.
+  function renderMarkdown() {
+    keepScrolled(() => {
+      for (const message of dirty) {
+        const md = message.querySelector(".md");
+        md.innerHTML = DOMPurify.sanitize(marked.parse(message.raw)); // replies can contain HTML: always sanitize
+        for (const pre of md.querySelectorAll("pre")) {
+          pre.append(button("Copy", (e) => copy(pre.querySelector("code")?.textContent ?? "", e.currentTarget)));
+        }
+      }
+    });
+    dirty.clear();
+  }
+
+  function enterToSubmit(textarea, targetForm) {
+    textarea.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      // IME users press Enter to confirm a character; keyCode 229 covers Safari's event-order bug.
+      if (event.isComposing || event.keyCode === 229) return;
+      targetForm.requestSubmit();
+    });
+  }
+
+  const sendEdit = (forkFrom, text) => post("/edit", { forkFrom: forkFrom ?? null, text }).catch(showError);
+
+  function startEdit(turn) {
+    const editor = el("form", "edit");
+    const area = el("textarea");
+    area.value = turn.raw;
+    area.setAttribute("aria-label", "Edit message");
+    const cancel = button("Cancel", () => {
+      editor.remove();
+      turn.hidden = false;
+    }, "secondary");
+    const save = el("button", "primary lock", "Send");
+    save.type = "submit";
+    const buttons = el("div", "edit-buttons");
+    buttons.append(cancel, save);
+    editor.append(area, buttons);
+    editor.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = area.value.trim();
+      if (text && !busy) sendEdit(turn.forkFrom, text);
+    });
+    area.addEventListener("keydown", (event) => event.key === "Escape" && cancel.click());
+    enterToSubmit(area, editor);
+    turn.hidden = true;
+    turn.after(editor);
+    area.focus();
+  }
+
+  // Regenerate = send the last user message again from the same fork point.
+  function updateRegenerate() {
+    $("regenerate")?.remove();
+    const lastUser = [...thread.querySelectorAll(".user-turn")].at(-1);
+    if (busy || !lastUser) return;
+    const b = button("Regenerate", () => sendEdit(lastUser.forkFrom, lastUser.raw), "ghost lock");
+    const lastAgent = [...thread.querySelectorAll(".agent")].at(-1);
+    if (lastAgent && lastUser.compareDocumentPosition(lastAgent) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      b.id = "regenerate";
+      lastAgent.querySelector(".actions").append(b);
+    } else {
+      const row = append(el("div", "actions"));
+      row.id = "regenerate";
+      row.append(b);
+    }
+  }
+
+  function setBusy(value) {
+    busy = value;
+    for (const b of document.querySelectorAll(".lock")) b.disabled = value;
+    sendButton.hidden = value;
+    stopButton.hidden = !value;
+    status.textContent = value ? "Claude is working…" : "";
+    if (!value) {
+      thread.querySelectorAll(".perm button").forEach((b) => (b.disabled = true));
+      updateRegenerate();
+      loadChats();
+    }
+  }
+
   function showPermission({ id, title, options }) {
     status.textContent = `Permission needed: ${title}`;
-    const note = add("note perm", `Permission needed: ${title}`);
-    note.setAttribute("role", "group");
-    note.setAttribute("aria-label", `Permission: ${title}`);
+    const box = note(`Permission needed: ${title}`, "note perm");
+    box.dataset.id = id;
+    box.dataset.title = title;
+    box.setAttribute("role", "group");
+    box.setAttribute("aria-label", `Permission: ${title}`);
     for (const { optionId, name } of options) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = name;
-      button.addEventListener("click", async () => {
-        note.querySelectorAll("button").forEach((b) => (b.disabled = true));
-        try {
-          await post("/permission", { id, optionId });
-          note.textContent = `${title}: ${name}`;
-          status.textContent = "Claude is answering…";
-        } catch (err) {
-          note.append(` (${err.message})`);
-        }
+      box.append(button(name, () => {
+        box.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        post("/permission", { id, optionId }).catch((err) => box.append(` (${err.message})`));
+      }, "secondary"));
+    }
+  }
+
+  // Menus for the standard ACP option categories, in this order. The adapter's other options
+  // (fast mode, ultracode, agent) stay at their defaults to keep the header short.
+  const MENUS = ["model", "thought_level", "mode"];
+
+  function showConfig(options) {
+    configOptions = options;
+    const focused = document.activeElement?.dataset.configId;
+    const shown = options
+      .filter((o) => o.type === "select" && MENUS.includes(o.category))
+      .sort((a, b) => MENUS.indexOf(a.category) - MENUS.indexOf(b.category));
+    configBox.replaceChildren(...shown.map((option) => {
+      const label = el("label", null, option.name);
+      const select = el("select", "lock");
+      select.dataset.configId = option.id;
+      select.title = option.description ?? "";
+      for (const choice of option.options.flatMap((o) => o.options ?? [o])) {
+        const item = el("option", null, choice.name);
+        item.value = choice.value;
+        item.title = choice.description ?? "";
+        select.append(item);
+      }
+      select.value = option.currentValue;
+      select.disabled = busy;
+      select.addEventListener("change", () => {
+        post("/config", { configId: option.id, value: select.value }).catch((err) => {
+          showError(err);
+          showConfig(configOptions); // put the menu back to the real value
+        });
       });
-      note.append(button);
+      label.append(select);
+      return label;
+    }));
+    if (focused) configBox.querySelector(`[data-config-id="${CSS.escape(focused)}"]`)?.focus();
+  }
+
+  function setSidebar(open) {
+    sidebar.classList.toggle("open", open);
+    menuButton.setAttribute("aria-expanded", String(open));
+  }
+
+  async function loadChats() {
+    const request = ++chatsRequest;
+    try {
+      const res = await fetch("/sessions");
+      if (!res.ok) throw new Error(await res.text());
+      const { chats } = await res.json();
+      if (request !== chatsRequest) return; // a newer request already ran
+      chats.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+      chatList.replaceChildren(...chats.map((chat) => {
+        const item = el("li");
+        const b = button(chat.title || "Untitled chat", () => {
+          setSidebar(false);
+          post("/open", { sessionId: chat.sessionId }).catch(showError);
+        }, "lock");
+        if (chat.sessionId === currentId) b.setAttribute("aria-current", "true");
+        item.append(b);
+        return item;
+      }));
+    } catch (err) {
+      chatList.replaceChildren(el("li", "note error", `Could not load chats: ${err.message}`));
     }
   }
 
@@ -155,22 +456,51 @@
   events.addEventListener("error", () => { status.textContent = "Disconnected. Retrying…"; });
   events.addEventListener("message", (e) => {
     const ev = JSON.parse(e.data);
-    if (ev.type === "text") {
-      reply ??= add("msg agent");
-      keepScrolled(() => reply.append(ev.text));
-      replyText += ev.text;
-    } else if (ev.type === "tool") {
-      add("note", `Tool: ${ev.title}`);
-      reply = null; // text after a tool call starts a new bubble
-    } else if (ev.type === "permission") {
-      showPermission(ev);
-    } else if (ev.type === "done") {
-      log.querySelectorAll(".perm button").forEach((b) => (b.disabled = true));
-      if (ev.error) add("note error", `Error: ${ev.error}`);
-      else if (ev.stopReason !== "end_turn") add("note", `Stopped: ${ev.stopReason}`);
-      announce.textContent = ev.error ?? replyText;
-      reply = null;
-      setBusy(false);
+    switch (ev.type) {
+      case "session":
+        currentId = ev.sessionId;
+        thread.replaceChildren();
+        dirty.clear();
+        reply = null;
+        lastAgentId = null;
+        turnText = "";
+        loadChats();
+        break;
+      case "busy":
+        setBusy(ev.value);
+        break;
+      case "user":
+        addUser(ev.text, ev.messageId);
+        break;
+      case "text":
+        addText(ev.text, ev.messageId);
+        break;
+      case "tool":
+        note(`Tool: ${ev.title}`);
+        reply = null; // text after a tool call starts a new message
+        break;
+      case "permission":
+        showPermission(ev);
+        break;
+      case "permission_done": {
+        const box = thread.querySelector(`.perm[data-id="${CSS.escape(ev.id)}"]`);
+        if (box) box.textContent = `${box.dataset.title}: ${ev.answer}`;
+        if (busy) status.textContent = "Claude is working…";
+        break;
+      }
+      case "title":
+        loadChats();
+        break;
+      case "config":
+        showConfig(ev.options);
+        break;
+      case "done":
+        if (ev.stopReason !== "end_turn") note(`Stopped: ${ev.stopReason}`);
+        announce.textContent = turnText;
+        break;
+      case "error":
+        showError(ev);
+        break;
     }
   });
 
@@ -178,30 +508,34 @@
     event.preventDefault();
     const text = input.value.trim();
     if (!text || busy) return;
-    add("msg user", text);
     input.value = "";
-    reply = null;
-    replyText = "";
-    setBusy(true);
+    input.focus(); // the Send button hides while Claude works; keep focus in the box
     try {
       await post("/prompt", { text });
     } catch (err) {
-      add("note error", `Error: ${err.message}`);
-      setBusy(false);
+      input.value = text;
+      showError(err);
     }
   });
+  enterToSubmit(input, form);
 
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      // IME users press Enter to confirm a character; keyCode 229 covers Safari's event-order bug.
-      if (event.isComposing || event.keyCode === 229) return;
-      form.requestSubmit();
-    }
+  stopButton.addEventListener("click", () => post("/cancel").catch(showError));
+
+  newButton.addEventListener("click", () => {
+    setSidebar(false);
+    post("/new").then(() => input.focus(), showError);
   });
 
-  stopButton.addEventListener("click", () => {
-    post("/cancel", {}).catch((err) => add("note error", `Error: ${err.message}`));
+  menuButton.addEventListener("click", () => {
+    const open = !sidebar.classList.contains("open");
+    setSidebar(open);
+    if (open) newButton.focus();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && sidebar.classList.contains("open")) {
+      setSidebar(false);
+      menuButton.focus();
+    }
   });
 </script>
 </body>
