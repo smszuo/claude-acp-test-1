@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ACP Chat</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5c5c5c;
+    --border: #8a8a8a;
+    --user-bg: #e6edfb;
+    --agent-bg: #f2f2f2;
+    --accent: #2152c9;
+    --accent-fg: #ffffff;
+    --error: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161616;
+      --fg: #ececec;
+      --muted: #a6a6a6;
+      --border: #6e6e6e;
+      --user-bg: #23324d;
+      --agent-bg: #242424;
+      --accent: #8fb0ff;
+      --accent-fg: #111111;
+      --error: #ff8a80;
+    }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.5 system-ui, sans-serif; }
+  main {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 48rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  #log { flex: 1; overflow-y: auto; padding-block: 1rem; }
+  .msg { margin-block: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .user { background: var(--user-bg); margin-inline-start: 15%; }
+  .agent { background: var(--agent-bg); }
+  .note { margin-block: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+  .note button { margin-inline-start: 0.5rem; padding: 0.125rem 0.625rem; }
+  .error { color: var(--error); }
+  #status { min-block-size: 1lh; margin: 0; }
+  form { display: flex; gap: 0.5rem; align-items: end; padding-block: 0.75rem; border-top: 1px solid var(--border); }
+  textarea {
+    flex: 1;
+    field-sizing: content; /* grows with the text; older browsers keep rows="2" and scroll */
+    min-block-size: 2lh;
+    max-block-size: 10lh;
+    padding: 0.5rem;
+    font: inherit;
+    color: inherit;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+  }
+  button { padding: 0.5rem 1rem; font: inherit; color: var(--accent-fg); background: var(--accent); border: 1px solid var(--accent); border-radius: 0.5rem; cursor: pointer; }
+  button.secondary { color: var(--accent); background: transparent; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="visually-hidden">Chat with Claude</h1>
+  <!-- Not a live region: streamed chunks would be read one by one. Finished replies go to #announce. -->
+  <section id="log" aria-label="Conversation"></section>
+  <p id="status" class="note" role="status"></p>
+  <p id="announce" class="visually-hidden" aria-live="polite"></p>
+  <form id="form">
+    <label for="input" class="visually-hidden">Message</label>
+    <textarea id="input" rows="2" placeholder="Message Claude (Enter to send, Shift+Enter for a new line)"></textarea>
+    <button type="submit" id="send">Send</button>
+    <button type="button" id="stop" class="secondary" disabled>Stop</button>
+  </form>
+</main>
+<script type="module">
+  const log = document.getElementById("log");
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const sendButton = document.getElementById("send");
+  const stopButton = document.getElementById("stop");
+  const status = document.getElementById("status");
+  const announce = document.getElementById("announce");
+  let busy = false;
+  let reply = null; // bubble that receives the streamed text
+  let replyText = "";
+
+  // Follow new content only if the user is already at the bottom.
+  function keepScrolled(change) {
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    change();
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  }
+
+  // textContent only: agent output is never parsed as HTML.
+  function add(className, text = "") {
+    const el = document.createElement("div");
+    el.className = className;
+    el.textContent = text;
+    keepScrolled(() => log.append(el));
+    return el;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    sendButton.disabled = value;
+    stopButton.disabled = !value;
+    status.textContent = value ? "Claude is answering…" : "";
+  }
+
+  async function post(path, data) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.text()) || res.statusText);
+  }
+
+  function showPermission({ id, title, options }) {
+    status.textContent = `Permission needed: ${title}`;
+    const note = add("note perm", `Permission needed: ${title}`);
+    note.setAttribute("role", "group");
+    note.setAttribute("aria-label", `Permission: ${title}`);
+    for (const { optionId, name } of options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = name;
+      button.addEventListener("click", async () => {
+        note.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        try {
+          await post("/permission", { id, optionId });
+          note.textContent = `${title}: ${name}`;
+          status.textContent = "Claude is answering…";
+        } catch (err) {
+          note.append(` (${err.message})`);
+        }
+      });
+      note.append(button);
+    }
+  }
+
+  const events = new EventSource("/events");
+  events.addEventListener("open", () => { if (!busy) status.textContent = ""; });
+  events.addEventListener("error", () => { status.textContent = "Disconnected. Retrying…"; });
+  events.addEventListener("message", (e) => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === "text") {
+      reply ??= add("msg agent");
+      keepScrolled(() => reply.append(ev.text));
+      replyText += ev.text;
+    } else if (ev.type === "tool") {
+      add("note", `Tool: ${ev.title}`);
+      reply = null; // text after a tool call starts a new bubble
+    } else if (ev.type === "permission") {
+      showPermission(ev);
+    } else if (ev.type === "done") {
+      log.querySelectorAll(".perm button").forEach((b) => (b.disabled = true));
+      if (ev.error) add("note error", `Error: ${ev.error}`);
+      else if (ev.stopReason !== "end_turn") add("note", `Stopped: ${ev.stopReason}`);
+      announce.textContent = ev.error ?? replyText;
+      reply = null;
+      setBusy(false);
+    }
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text || busy) return;
+    add("msg user", text);
+    input.value = "";
+    reply = null;
+    replyText = "";
+    setBusy(true);
+    try {
+      await post("/prompt", { text });
+    } catch (err) {
+      add("note error", `Error: ${err.message}`);
+      setBusy(false);
+    }
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      // IME users press Enter to confirm a character; keyCode 229 covers Safari's event-order bug.
+      if (event.isComposing || event.keyCode === 229) return;
+      form.requestSubmit();
+    }
+  });
+
+  stopButton.addEventListener("click", () => {
+    post("/cancel", {}).catch((err) => add("note error", `Error: ${err.message}`));
+  });
+</script>
+</body>
+</html>
